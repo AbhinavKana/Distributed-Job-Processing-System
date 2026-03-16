@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	jobpb "distributed-job-system/proto/jobpb" // use your module path if different
+	jobpb "distributed-job-system/proto/jobpb" 
 )
 
 func main() {
