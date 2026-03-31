@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	jobpb "distributed-job-system/proto/jobpb" 
+	jobpb "distributed-job-system/proto/jobpb"
 )
 
 func main() {
@@ -19,10 +19,10 @@ func main() {
 
 	client := jobpb.NewJobServiceClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Create Job
+	// 1️⃣ Create Job
 	resp, err := client.CreateJob(ctx, &jobpb.CreateJobRequest{
 		Payload: "test job",
 	})
@@ -30,5 +30,26 @@ func main() {
 		log.Fatalf("could not create job: %v", err)
 	}
 
-	log.Printf("Created Job ID: %s\n", resp.JobId)
+	jobID := resp.JobId
+	log.Printf("✅ Created Job ID: %s\n", jobID)
+
+	// 2️⃣ Poll Job Status (simulate real client)
+	for i := 0; i < 5; i++ {
+		time.Sleep(2 * time.Second)
+
+		statusResp, err := client.GetJobStatus(ctx, &jobpb.GetJobStatusRequest{
+			JobId: jobID,
+		})
+		if err != nil {
+			log.Printf("❌ failed to get status: %v\n", err)
+			continue
+		}
+
+		log.Printf("📊 Job Status: %s\n", statusResp.Status)
+
+		// stop early if completed
+		if statusResp.Status == "completed" || statusResp.Status == "failed" {
+			break
+		}
+	}
 }
