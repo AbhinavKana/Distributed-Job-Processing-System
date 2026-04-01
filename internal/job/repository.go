@@ -1,6 +1,7 @@
 package job
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"log"
@@ -64,7 +65,7 @@ func (r *Repository) UpdateStatus(id string, status JobStatus) error {
 	WHERE id = $3
 	`
 
-	_, err := r.db.Exec(query, status, time.Now(), id)
+	_, err := r.db.ExecContext(context.Background(), query, status, time.Now(), id)
 	return err
 }
 
@@ -75,7 +76,7 @@ func (r *Repository) IncrementRetry(id string) error {
 	WHERE id = $2
 	`
 
-	_, err := r.db.Exec(query, time.Now(), id)
+	_, err := r.db.ExecContext(context.Background(), query, time.Now(), id)
 	return err
 }
 
@@ -119,10 +120,21 @@ func (r *Repository) InsertJob(payload map[string]interface{}) (string, error) {
 	VALUES ($1, $2, $3)
 	`
 
-	_, err = r.db.Exec(query, id, payloadBytes, StatusPending)
+	_, err = r.db.ExecContext(context.Background(), query, id, payloadBytes, StatusPending)
 	if err != nil {
 		return "", err
 	}
 
 	return id, nil
+}
+
+func (r *Repository) UpdateResult(id string, result string) error {
+	query := `
+	UPDATE jobs
+	SET result = $1, updated_at = $2
+	WHERE id = $3
+	`
+
+	_, err := r.db.ExecContext(context.Background(), query, result, time.Now(), id)
+	return err
 }

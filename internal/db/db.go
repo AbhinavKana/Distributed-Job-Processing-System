@@ -3,31 +3,25 @@ package db
 import (
 	"database/sql"
 	"log"
-	"time"
 
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 var DB *sql.DB
 
 func InitDB(connStr string) {
 	var err error
-
-	DB, err = sql.Open("postgres", connStr)
+	DB, err = sql.Open("pgx", connStr)
 	if err != nil {
-		log.Fatal("Error opening DB:", err)
+		log.Fatal(err)
 	}
 
-	// Connection pool settings (important for remote DB like Neon)
-	DB.SetMaxOpenConns(10)
-	DB.SetMaxIdleConns(5)
-	DB.SetConnMaxLifetime(5 * time.Minute)
-
-	if err = DB.Ping(); err != nil {
-		log.Fatal("DB unreachable:", err)
+	err = DB.Ping()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	log.Println("✅ Connected to DB")
+	log.Println("Connected to DB (pgx)")
 }
 
 func GetDB() *sql.DB {

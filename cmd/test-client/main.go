@@ -24,7 +24,7 @@ func main() {
 
 	// 1️⃣ Create Job
 	resp, err := client.CreateJob(ctx, &jobpb.CreateJobRequest{
-		Payload: "test job",
+		Payload: `{"type":"fetch_user","user_id":3}`,
 	})
 	if err != nil {
 		log.Fatalf("could not create job: %v", err)

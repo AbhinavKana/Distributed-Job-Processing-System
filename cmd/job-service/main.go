@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 	"time"
@@ -27,15 +29,25 @@ type server struct {
 // Create Job → DB first, then Kafka
 func (s *server) CreateJob(ctx context.Context, req *jobpb.CreateJobRequest) (*jobpb.CreateJobResponse, error) {
 
-	jobID, err := s.repo.InsertJob(map[string]interface{}{
-		"task": "default",
-	})
+	// 1️⃣ Parse incoming payload
+	var payload map[string]interface{}
+
+	err := json.Unmarshal([]byte(req.Payload), &payload)
+	if err != nil {
+		log.Printf("❌ Invalid payload: %v\n", err)
+		return nil, fmt.Errorf("invalid payload")
+	}
+
+	log.Println("📥 Received payload:", payload)
+
+	// 2️⃣ Insert into DB
+	jobID, err := s.repo.InsertJob(payload)
 	if err != nil {
 		log.Printf("❌ Failed to insert job: %v\n", err)
 		return nil, err
 	}
 
-	// Publish to Kafka
+	// 3️⃣ Publish to Kafka
 	err = s.writer.WriteMessages(ctx,
 		kafka.Message{
 			Value: []byte(jobID),

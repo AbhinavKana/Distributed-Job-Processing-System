@@ -4,10 +4,13 @@ import (
 	"context"
 	"distributed-job-system/internal/db"
 	"distributed-job-system/internal/job"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -117,7 +120,7 @@ func processMessage(
 	}
 
 	// process
-	err = processJob(jobID)
+	err = processJob(ctx, repo, jobID)
 
 	if err != nil {
 		log.Printf("Job %s failed\n", jobID)
@@ -162,15 +165,82 @@ func processMessage(
 	log.Printf("Job %s completed successfully\n", jobID)
 }
 
-func processJob(jobID string) error {
+func processJob(ctx context.Context, repo *job.Repository, jobID string) error {
 	log.Printf("Processing job %s\n", jobID)
 
-	time.Sleep(2 * time.Second)
-
-	// simulate failure (50% chance)
-	if time.Now().Unix()%2 == 0 {
-		return fmt.Errorf("simulated failure")
+	// 1️⃣ Fetch job from DB
+	j, err := repo.GetJobByID(jobID)
+	if err != nil {
+		return err
 	}
+
+	payloadMap := j.Payload
+	log.Println("📦 Payload:", payloadMap)
+
+	jobType, ok := payloadMap["type"].(string)
+	if !ok {
+		return fmt.Errorf("invalid payload: missing type")
+	}
+	switch jobType {
+	case "fetch_user":
+		// continue your current logic (API call etc.)
+
+	default:
+		return fmt.Errorf("unknown job type: %s", jobType)
+	}
+
+	userIDFloat, ok := payloadMap["user_id"].(float64)
+	if !ok {
+		return fmt.Errorf("invalid payload: missing user_id")
+	}
+
+	userID := int(userIDFloat)
+
+	// // 3️⃣ Simulate real failure (to trigger retries)
+	// if rand.Intn(10) < 3 {
+	// 	return fmt.Errorf("simulated failure")
+	// }
+
+	// 4️⃣ External API call (REAL WORK)
+	url := fmt.Sprintf("https://jsonplaceholder.typicode.com/users/%d", userID)
+	log.Println("🌐 Calling API:", url)
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("❌ DB update failed:", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("bad response: %d", resp.StatusCode)
+	}
+
+	// 5️⃣ Decode response
+	var user struct {
+		Name  string `json:"name"`
+		Email string `json:"email"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+		return err
+	}
+
+	// 6️⃣ Processing
+	processed := strings.ToUpper(user.Name)
+
+	// 7️⃣ Store result in DB (IMPORTANT)
+	err = repo.UpdateResult(jobID, processed)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Job %s processed: %s\n", jobID, processed)
 
 	return nil
 }
